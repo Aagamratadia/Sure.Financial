@@ -63,17 +63,15 @@ class AxisExtractor(BaseExtractor):
             r"From\s+(\d{2}/\d{2}/\d{4})\s+(?:to|To|TO)\s+(\d{2}/\d{2}/\d{4})",
             r"Statement\s+from\s*.{0,100}?(\d{2}/\d{2}/\d{4})\s*(?:to|To|TO)\s*(\d{2}/\d{2}/\d{4})",
         ]
-        
         for pattern in range_patterns:
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if match:
                 start_raw = match.group(1)
                 end_raw = match.group(2)
-                
                 start_date = parse_date(start_raw)
                 end_date = parse_date(end_raw)
-                
                 if start_date and end_date:
+                    # Statement date for Axis is the start date (statement generated date)
                     field = DateRangeField(
                         raw=f"{start_raw} to {end_raw}",
                         start_date=start_date,
@@ -81,29 +79,25 @@ class AxisExtractor(BaseExtractor):
                     )
                     logger.info(f"Axis: Found statement period: {start_date} to {end_date}")
                     return field, 0.9
-        
         # Single date patterns (fallback)
         single_patterns = [
             r"Statement\s+Date\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
             r"Statement\s+on\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
             r"Date\s+of\s+Statement\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
         ]
-        
         for pattern in single_patterns:
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if match:
                 date_raw = match.group(1)
-                end_date = parse_date(date_raw)
-                
-                if end_date:
+                start_date = parse_date(date_raw)
+                if start_date:
                     field = DateRangeField(
                         raw=f"Statement Date {date_raw}",
-                        start_date="",
-                        end_date=end_date
+                        start_date=start_date,
+                        end_date=""
                     )
-                    logger.info(f"Axis: Found single statement date: {end_date}")
+                    logger.info(f"Axis: Found single statement date: {start_date}")
                     return field, 0.85
-        
         # Fallback to general date range parsing
         start_date, end_date = parse_date_range(text)
         if start_date and end_date:
@@ -114,7 +108,6 @@ class AxisExtractor(BaseExtractor):
             )
             logger.info(f"Axis: Parsed statement period: {start_date} to {end_date}")
             return field, 0.9
-        
         logger.warning("Axis: Statement period not found")
         return DateRangeField(raw=""), 0.0
     
