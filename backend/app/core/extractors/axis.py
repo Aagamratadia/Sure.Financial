@@ -113,7 +113,7 @@ class AxisExtractor(BaseExtractor):
                 end_date=end_date
             )
             logger.info(f"Axis: Parsed statement period: {start_date} to {end_date}")
-            return field, 0.7
+            return field, 0.9
         
         logger.warning("Axis: Statement period not found")
         return DateRangeField(raw=""), 0.0
