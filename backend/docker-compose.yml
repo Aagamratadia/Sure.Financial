@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: credit-card-parser-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=credit_card_parser
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/credit_card_parser --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: credit-card-parser-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./app:/app/app
+      - pdf_storage:/tmp/pdf_parser
+    environment:
+      - MONGODB_URL=mongodb://mongodb:27017
+      - MONGODB_DB_NAME=credit_card_parser
+      - MAX_FILE_SIZE=10485760
+      - TEMP_DIR=/tmp/pdf_parser
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+  pdf_storage:

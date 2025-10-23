@@ -1,0 +1,111 @@
+{
+  "info": {
+    "name": "Credit Card Parser API",
+    "description": "Collection for testing the Credit Card Statement Parser API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "health"]
+        }
+      }
+    },
+    {
+      "name": "Upload Statement",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            },
+            {
+              "key": "use_ocr",
+              "value": "false",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/parse/upload",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "parse", "upload"]
+        }
+      }
+    },
+    {
+      "name": "Get Job Status",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/parse/{{jobId}}/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "parse", "{{jobId}}", "status"]
+        }
+      }
+    },
+    {
+      "name": "Get Results",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/parse/{{jobId}}/results",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "parse", "{{jobId}}", "results"]
+        }
+      }
+    },
+    {
+      "name": "Batch Upload",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "files",
+              "type": "file",
+              "src": []
+            },
+            {
+              "key": "use_ocr",
+              "value": "false",
+              "type": "text"
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/parse/batch",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "parse", "batch"]
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "jobId",
+      "value": "your-job-id-here",
+      "type": "string"
+    }
+  ]
+}
