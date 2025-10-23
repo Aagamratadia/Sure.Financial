@@ -33,54 +33,50 @@ class IDFCExtractor(BaseExtractor):
         return "", 0.0
     
     def extract_card_number(self, text: str) -> Tuple[str, float]:
-        """Extract card number - IDFC format: varies (XXXX XXXX XXXX 1234)"""
+        """Extract card number - IDFC format: varies (XX7853, XXXX XXXX XXXX 1234)"""
         patterns = [
+            # Full format
+            r"Card\s+(?:No|Number)\s*\.?\s*:?\s*([X*\d]{4}\s*[X*\d]{4}\s*[X*\d]{4}\s*\d{4})",
             r"(\d{4}\s*X{4}\s*X{4}\s*\d{4})",
             r"(\d{4}\s*\*{4}\s*\*{4}\s*\d{4})",
-            r"Card\s+(?:No|Number)\s*\.?\s*:?\s*(\d{4}[\sX\*]+\d{4})",
             r"(\d{4}[\s\-]X{4}[\s\-]X{4}[\s\-]\d{4})",
+            # Short format (just last digits)
+            r"Card\s+(?:No|Number)\s*\.?\s*:?\s*([X*]{2,6}\d{4})",
+            r"Card\s+(?:No|Number)\s*\.?\s*:?\s*(XX\d{4,6})",
         ]
         
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
-                card_num = match.group(1)
+                card_num = match.group(1).strip()
                 # Normalize spacing
                 card_num = ' '.join(card_num.split())
                 logger.info(f"IDFC: Found card number: {card_num}")
-                return card_num, 1.0
+                return card_num, 0.9
         
         logger.warning("IDFC: Card number not found")
         return "", 0.0
     
     def extract_statement_period(self, text: str) -> Tuple[DateRangeField, float]:
-        """Extract statement period - IDFC format: varies"""
+        """Extract statement period - IDFC format: 20/May/2025 - 19/Jun/2025"""
         patterns = [
-            # IDFC may use "Statement Date" or "Statement Period"
-            r"Statement\s+Date.{0,100}?(\d{2}[/-]\d{2}[/-]\d{4})",
-            r"Statement\s+Period\s*:?\s*(\d{2}[/-]\d{2}[/-]\d{4})\s*(?:to|To|-)\s*(\d{2}[/-]\d{2}[/-]\d{4})",
+            # Mixed format: DD/Mon/YYYY - DD/Mon/YYYY
+            r"(\d{1,2}/\w{3}/\d{4})\s*-\s*(\d{1,2}/\w{3}/\d{4})",
+            # Standard formats
+            r"Statement\s+Period\s*:?\s*.{0,100}?(\d{2}[/-]\d{2}[/-]\d{4})\s*(?:to|To|-)\s*(\d{2}[/-]\d{2}[/-]\d{4})",
+            r"Statement\s+Date\s*:?\s*.{0,100}?(\d{2}[/-]\d{2}[/-]\d{4})\s*(?:to|To|-)\s*(\d{2}[/-]\d{2}[/-]\d{4})",
             r"Statement\s+for\s+period\s*:?\s*(\d{2}[/-]\d{2}[/-]\d{4})\s*(?:to|To|-)\s*(\d{2}[/-]\d{2}[/-]\d{4})",
             r"From\s+(\d{2}[/-]\d{2}[/-]\d{4})\s*(?:to|To)\s*(\d{2}[/-]\d{2}[/-]\d{4})",
+            # DD-Mon-YYYY format
+            r"(\d{1,2}-\w{3}-\d{4})\s*(?:to|To|-)\s*(\d{1,2}-\w{3}-\d{4})",
         ]
         
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if match:
                 groups = match.groups()
-                if len(groups) == 1:
-                    # Single statement date - use as end date
-                    date_raw = groups[0]
-                    end_date = parse_date(date_raw)
-                    if end_date:
-                        field = DateRangeField(
-                            raw=f"Statement Date {date_raw}",
-                            start_date="",
-                            end_date=end_date
-                        )
-                        logger.info(f"IDFC: Found statement date: {end_date}")
-                        return field, 0.8
-                else:
-                    start_raw, end_raw = groups
+                if len(groups) >= 2:
+                    start_raw, end_raw = groups[0], groups[1]
                     start_date = parse_date(start_raw)
                     end_date = parse_date(end_raw)
                     
@@ -91,7 +87,27 @@ class IDFCExtractor(BaseExtractor):
                             end_date=end_date
                         )
                         logger.info(f"IDFC: Found statement period: {start_date} to {end_date}")
-                        return field, 1.0
+                        return field, 0.95
+        
+        # Single date patterns
+        single_patterns = [
+            r"Statement\s+Date\s*:?\s*.{0,100}?(\d{2}[/-]\d{2}[/-]\d{4})",
+            r"Statement\s+Date\s*:?\s*.{0,100}?(\d{1,2}/\w{3}/\d{4})",
+        ]
+        
+        for pattern in single_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                date_raw = match.group(1)
+                end_date = parse_date(date_raw)
+                if end_date:
+                    field = DateRangeField(
+                        raw=f"Statement Date {date_raw}",
+                        start_date="",
+                        end_date=end_date
+                    )
+                    logger.info(f"IDFC: Found statement date: {end_date}")
+                    return field, 0.8
         
         # Fallback
         start_date, end_date = parse_date_range(text)
@@ -108,15 +124,21 @@ class IDFCExtractor(BaseExtractor):
         return DateRangeField(raw=""), 0.0
     
     def extract_due_date(self, text: str) -> Tuple[DateField, float]:
-        """Extract payment due date - IDFC format: varies"""
+        """Extract payment due date - IDFC format: 04/Jul/2025"""
         patterns = [
-            # Common IDFC patterns
-            r"Payment\s+Due\s+Date\s*:?\s*(\d{2}[/-]\d{2}[/-]\d{4})",
-            r"Due\s+Date\s*:?\s*(\d{2}[/-]\d{2}[/-]\d{4})",
-            r"Pay\s+by\s*:?\s*(\d{2}[/-]\d{2}[/-]\d{4})",
-            r"Payment\s+due\s+on\s*:?\s*(\d{2}[/-]\d{2}[/-]\d{4})",
+            # DD/Mon/YYYY format
+            r"Payment\s+Due\s+Date\s*:?\s*.{0,100}?(\d{1,2}/\w{3}/\d{4})",
+            r"Due\s+Date\s*:?\s*.{0,100}?(\d{1,2}/\w{3}/\d{4})",
+            # DD-Mon-YYYY format
+            r"Payment\s+Due\s+Date\s*:?\s*.{0,100}?(\d{1,2}-\w{3}-\d{4})",
+            r"Due\s+Date\s*:?\s*.{0,100}?(\d{1,2}-\w{3}-\d{4})",
+            # Standard DD/MM/YYYY format
+            r"Payment\s+Due\s+Date\s*:?\s*.{0,100}?(\d{2}[/-]\d{2}[/-]\d{4})",
+            r"Due\s+Date\s*:?\s*.{0,100}?(\d{2}[/-]\d{2}[/-]\d{4})",
+            r"Pay\s+by\s*:?\s*.{0,100}?(\d{2}[/-]\d{2}[/-]\d{4})",
+            r"Payment\s+due\s+on\s*:?\s*.{0,100}?(\d{2}[/-]\d{2}[/-]\d{4})",
             # Generic pattern - look for date after "due"
-            r"Due\s+(?:Date|on).{0,50}?(\d{2}[/-]\d{2}[/-]\d{4})",
+            r"Due\s+(?:Date|on)\s*.{0,50}?(\d{1,2}[/-]\w{3}[/-]\d{4})",
         ]
         
         for pattern in patterns:
@@ -131,7 +153,7 @@ class IDFCExtractor(BaseExtractor):
                         formatted=date_formatted
                     )
                     logger.info(f"IDFC: Found due date: {date_formatted}")
-                    return field, 1.0
+                    return field, 0.95
         
         logger.warning("IDFC: Due date not found")
         return DateField(raw=""), 0.0

@@ -11,6 +11,7 @@ logger = logging.getLogger(__name__)
 # Common date formats in credit card statements
 DATE_FORMATS = [
     "%d-%b-%Y",      # 1-Mar-2023
+    "%d/%b/%Y",      # 20/May/2025 (IDFC format)
     "%d%m%Y",        # 08062019
     "%B %d, %Y",     # January 14, 2024
     "%d/%m/%Y",      # 01/03/2023
