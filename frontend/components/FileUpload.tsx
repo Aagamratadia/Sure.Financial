@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
-import { Upload, File } from 'lucide-react'
+import { Upload, File, Shield, AlertCircle } from 'lucide-react'
 import { uploadStatement } from '@/lib/api'
 
 interface FileUploadProps {
@@ -16,6 +16,8 @@ export default function FileUpload({
   onUploadError, 
   onUploadStart 
 }: FileUploadProps) {
+  const [dragOver, setDragOver] = useState(false);
+  
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     if (acceptedFiles.length === 0) {
       onUploadError('Please select a valid PDF file')
@@ -46,13 +48,17 @@ export default function FileUpload({
     }
   }, [onUploadComplete, onUploadError, onUploadStart])
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     accept: {
       'application/pdf': ['.pdf']
     },
     maxFiles: 1,
-    multiple: false
+    multiple: false,
+    onDragEnter: () => setDragOver(true),
+    onDragLeave: () => setDragOver(false),
+    onDropAccepted: () => setDragOver(false),
+    onDropRejected: () => setDragOver(false)
   })
 
   return (
@@ -60,51 +66,82 @@ export default function FileUpload({
       <div
         {...getRootProps()}
         className={`
-          border-3 border-dashed rounded-xl p-12 text-center cursor-pointer
-          transition-all duration-200
-          ${isDragActive 
-            ? 'border-blue-500 bg-blue-50' 
-            : 'border-gray-300 bg-white hover:border-blue-400 hover:bg-gray-50'
+          border-2 border-dashed rounded-xl p-8 md:p-12 text-center cursor-pointer
+          transition-all duration-300 shadow-sm
+          ${dragOver 
+            ? 'border-amber-600 bg-amber-50 shadow-md scale-[1.02]' 
+            : 'border-gray-300 bg-white hover:border-amber-600 hover:bg-stone-50 hover:shadow'
           }
         `}
+        aria-label="Drop zone for PDF upload"
+        role="button"
+        tabIndex={0}
       >
-        <input {...getInputProps()} />
+        <input {...getInputProps()} aria-label="File upload input" />
         
         <div className="flex flex-col items-center">
-          {isDragActive ? (
-            <Upload className="h-16 w-16 text-blue-500 mb-4 animate-bounce" />
-          ) : (
-            <File className="h-16 w-16 text-gray-400 mb-4" />
-          )}
+          <div className={`
+            rounded-full p-4 mb-6
+            ${dragOver 
+              ? 'bg-blue-100' 
+              : 'bg-gray-100'
+            }
+          `}>
+            {dragOver ? (
+              <Upload className="h-12 w-12 text-amber-700 animate-bounce" aria-hidden="true" />
+            ) : (
+              <File className="h-12 w-12 text-amber-700" aria-hidden="true" />
+            )}
+          </div>
           
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            {isDragActive ? 'Drop your PDF here' : 'Upload Credit Card Statement'}
+          <h3 className="text-2xl font-semibold text-black mb-3">
+            {dragOver ? 'Drop your PDF here' : 'Upload Credit Card Statement'}
           </h3>
           
-          <p className="text-gray-600 mb-4">
-            Drag and drop your PDF file here, or click to browse
+          <p className="text-black mb-6 max-w-md mx-auto">
+            Drag and drop your PDF file here, or click to browse your files
           </p>
           
-          <div className="text-sm text-gray-500">
-            <p>Supported formats: PDF only</p>
-            <p>Maximum file size: 10MB</p>
+          <div className="flex flex-wrap justify-center gap-4 mb-6">
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm text-black">
+              <File className="h-4 w-4" aria-hidden="true" />
+              <span>PDF only</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm text-black">
+              <AlertCircle className="h-4 w-4" aria-hidden="true" />
+              <span>Max 10MB</span>
+            </div>
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg text-sm text-black">
+              <Shield className="h-4 w-4" aria-hidden="true" />
+              <span>Secure Processing</span>
+            </div>
           </div>
 
           <button
             type="button"
-            className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            onClick={open}
+            className="mt-2 px-6 py-3 bg-amber-700 text-white rounded-md hover:shadow-md transition-all font-medium focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
+            aria-label="Select file to upload"
           >
             Select File
           </button>
         </div>
       </div>
+      
+      <div className="mt-6 text-center">
+        <p className="text-sm text-black">
+          By uploading a file, you agree to our <a href="#" className="text-black underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:rounded">Terms of Service</a> and <a href="#" className="text-black underline focus:outline-none focus:ring-2 focus:ring-blue-500 focus:rounded">Privacy Policy</a>
+        </p>
+      </div>
 
-      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <h4 className="font-semibold text-blue-900 mb-2 text-sm">Supported Banks:</h4>
-        <ul className="text-sm text-blue-800 space-y-1">
+      <div className="mt-6 p-4 bg-amber-50 rounded-lg border border-amber-200">
+        <h4 className="font-semibold text-black mb-2 text-sm">Supported Banks:</h4>
+        <ul className="text-sm text-black space-y-1">
           <li>✓ Kotak Mahindra Bank</li>
+          <li>✓ Axis Bank</li>
           <li>✓ HDFC Bank</li>
           <li>✓ ICICI Bank</li>
+          <li>✓ IDFC Bank</li>
           <li>✓ American Express</li>
           <li>✓ Capital One</li>
         </ul>

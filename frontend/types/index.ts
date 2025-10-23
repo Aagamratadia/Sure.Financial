@@ -46,6 +46,7 @@ export interface ParseResult {
   confidence_scores?: ConfidenceScores
   error?: string
   processing_time?: number
+  created_at?: string
 }
 
 export interface UploadResponse {
