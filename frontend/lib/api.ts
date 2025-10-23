@@ -2,7 +2,12 @@
 import { ParseResult, JobStatusResponse } from '@/types';
 
 // API base URL
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') || 'http://localhost:8000/api/v1';
+export const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? 'https://rag-cloud-test-production.up.railway.app/api/v1'
+    : 'http://localhost:8000/api/v1')
+).replace(/\/$/, '');
 
 /**
  * Upload a statement file for processing

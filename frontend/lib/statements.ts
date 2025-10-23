@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { ParseResult } from '@/types'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 
 // Fallback mock data in case MongoDB connection fails
 const MOCK_STATEMENTS: ParseResult[] = [
@@ -125,7 +125,7 @@ export async function getAllSavedStatements(forceRefresh = false): Promise<Parse
   }
 
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/v1/results`, { params: { limit: 100 } });
+    const response = await axios.get(`${API_BASE_URL}/results`, { params: { limit: 100 } });
     const docs = Array.isArray(response.data) ? response.data : [];
     const mapped: ParseResult[] = docs.map(mapDbToParseResult);
     statementsCache.data = mapped;
@@ -151,7 +151,7 @@ export async function getSavedStatementById(statementId: string): Promise<ParseR
     }
     
     // Make API call to fetch specific statement
-    const response = await axios.get(`${API_BASE_URL}/api/v1/results/${statementId}`);
+    const response = await axios.get(`${API_BASE_URL}/results/${statementId}`);
     const mapped = mapDbToParseResult(response.data);
     // Optionally add to cache
     addStatementToCache(mapped);

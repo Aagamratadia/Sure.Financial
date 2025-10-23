@@ -1,7 +1,7 @@
 import axios from 'axios'
 import type { ParseResult } from '@/types'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
 
 /**
  * Save parsed statement result to database
@@ -9,7 +9,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 export async function saveResultToDatabase(result: ParseResult): Promise<{ success: boolean; message: string; result_id?: string }> {
   try {
     const response = await axios.post(
-      `${API_BASE_URL}/api/v1/results/save`,
+      `${API_BASE_URL}/results/save`,
       result,
       {
         headers: {
@@ -48,7 +48,7 @@ export async function saveResultToDatabase(result: ParseResult): Promise<{ succe
  */
 export async function getResultFromDatabase(resultId: string): Promise<ParseResult | null> {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/v1/results/${resultId}`)
+    const response = await axios.get(`${API_BASE_URL}/results/${resultId}`)
     return response.data.raw_data
   } catch (error: any) {
     console.error('Error retrieving result from database:', error)
