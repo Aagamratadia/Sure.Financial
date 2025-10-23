@@ -54,28 +54,135 @@ class AxisExtractor(BaseExtractor):
         return "", 0.0
     
     def extract_statement_period(self, text: str) -> Tuple[DateRangeField, float]:
-        """Extract statement period and statement generated date for Axis Bank"""
-        # Try to find payment summary line: ... 16/08/2024 - 15/09/2024 05/10/2024 13/09/2024
+        """Extract statement period for Axis Bank"""
         summary_pattern = r"(\d{1,2}/\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{1,2}/\d{4})\s+(\d{1,2}/\d{1,2}/\d{4})\s+(\d{1,2}/\d{1,2}/\d{4})"
         match = re.search(summary_pattern, text)
         if match:
             start_raw = match.group(1)
             end_raw = match.group(2)
-            due_raw = match.group(3)
-            statement_raw = match.group(4)
             start_date = parse_date(start_raw)
             end_date = parse_date(end_raw)
-            statement_date = parse_date(statement_raw)
-            if start_date and end_date and statement_date:
+            if start_date and end_date:
                 field = DateRangeField(
                     raw=f"{start_raw} to {end_raw}",
                     start_date=start_date,
                     end_date=end_date
                 )
-                # Store statement_date in a custom attribute for use in serialization if needed
-                field.generated_date = statement_date
-                logger.info(f"Axis: Found statement period: {start_date} to {end_date}, statement date: {statement_date}")
+                logger.info(f"Axis: Found statement period: {start_date} to {end_date}")
                 return field, 0.9
+        # Fallback to previous logic
+        range_patterns = [
+            r"Statement\s+Date\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})\s*(?:to|To|TO)\s*(\d{2}/\d{2}/\d{4})",
+            r"Statement\s+Period\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})\s*(?:to|To|TO)\s*(\d{2}/\d{2}/\d{4})",
+            r"Billing\s+Cycle\s*:?\s*.{0,100}?(\d{2}-\w{3}-\d{4})\s*(?:to|To|TO)\s*(\d{2}-\w{3}-\d{4})",
+            r"From\s+(\d{2}/\d{2}/\d{4})\s+(?:to|To|TO)\s+(\d{2}/\d{2}/\d{4})",
+            r"Statement\s+from\s*.{0,100}?(\d{2}/\d{2}/\d{4})\s*(?:to|To|TO)\s*(\d{2}/\d{2}/\d{4})",
+        ]
+        for pattern in range_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                start_raw = match.group(1)
+                end_raw = match.group(2)
+                start_date = parse_date(start_raw)
+                end_date = parse_date(end_raw)
+                if start_date and end_date:
+                    field = DateRangeField(
+                        raw=f"{start_raw} to {end_raw}",
+                        start_date=start_date,
+                        end_date=end_date
+                    )
+                    logger.info(f"Axis: Found statement period: {start_date} to {end_date}")
+                    return field, 0.9
+        # Single date patterns (fallback)
+        single_patterns = [
+            r"Statement\s+Date\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
+            r"Statement\s+on\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
+            r"Date\s+of\s+Statement\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
+        ]
+        for pattern in single_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                date_raw = match.group(1)
+                start_date = parse_date(date_raw)
+                if start_date:
+                    field = DateRangeField(
+                        raw=f"Statement Date {date_raw}",
+                        start_date=start_date,
+                        end_date=""
+                    )
+                    logger.info(f"Axis: Found single statement date: {start_date}")
+                    return field, 0.85
+        # Fallback to general date range parsing
+        start_date, end_date = parse_date_range(text)
+        if start_date and end_date:
+            field = DateRangeField(
+                raw="Parsed from text",
+                start_date=start_date,
+                end_date=end_date
+            )
+            logger.info(f"Axis: Parsed statement period: {start_date} to {end_date}")
+            return field, 0.9
+        logger.warning("Axis: Statement period not found")
+        return DateRangeField(raw=""), 0.0
+
+    def extract_statement_date(self, text: str) -> Tuple[str, float]:
+        """Extract statement generated date for Axis Bank"""
+        summary_pattern = r"(\d{1,2}/\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{1,2}/\d{4})\s+(\d{1,2}/\d{1,2}/\d{4})\s+(\d{1,2}/\d{1,2}/\d{4})"
+        match = re.search(summary_pattern, text)
+        if match:
+            statement_raw = match.group(4)
+            statement_date = parse_date(statement_raw)
+            if statement_date:
+                logger.info(f"Axis: Found statement generated date: {statement_date}")
+                return statement_date, 0.9
+        # Fallback to single date patterns
+        single_patterns = [
+            r"Statement\s+Date\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
+            r"Statement\s+on\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
+            r"Date\s+of\s+Statement\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
+        ]
+        for pattern in single_patterns:
+            match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+            if match:
+                date_raw = match.group(1)
+                statement_date = parse_date(date_raw)
+                if statement_date:
+                    logger.info(f"Axis: Found statement generated date (fallback): {statement_date}")
+                    return statement_date, 0.85
+        logger.warning("Axis: Statement generated date not found")
+        return "", 0.0
+    def extract_all(self, text: str) -> dict:
+        logger.info(f"Extracting data using {self.__class__.__name__}")
+        logger.info(f"Text length: {len(text)} characters")
+        if len(text) > 0:
+            logger.info(f"First 800 chars:\n{text[:800]}")
+            logger.info(f"Last 800 chars:\n{text[-800:]}")
+
+        issuer, issuer_conf = self.extract_card_issuer(text)
+        card_number, card_conf = self.extract_card_number(text)
+        statement_period, period_conf = self.extract_statement_period(text)
+        statement_date, date_conf = self.extract_statement_date(text)
+        due_date, due_conf = self.extract_due_date(text)
+        total_amount, amount_conf = self.extract_total_amount(text)
+
+        return {
+            "data": {
+                "card_issuer": issuer,
+                "card_number": card_number,
+                "statement_period": statement_period,
+                "statement_date": statement_date,
+                "payment_due_date": due_date,
+                "total_amount_due": total_amount,
+            },
+            "confidence": {
+                "card_issuer": issuer_conf,
+                "card_number": card_conf,
+                "statement_period": period_conf,
+                "statement_date": date_conf,
+                "payment_due_date": due_conf,
+                "total_amount_due": amount_conf,
+            }
+        }
         # Fallback to previous logic
         range_patterns = [
             r"Statement\s+Date\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})\s*(?:to|To|TO)\s*(\d{2}/\d{2}/\d{4})",

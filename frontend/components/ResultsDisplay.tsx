@@ -100,7 +100,9 @@ export default function ResultsDisplay({ result, onReset }: ResultsDisplayProps)
                 <div>
                   <h4 className="font-semibold text-gray-900">Statement Date</h4>
                   <p className="text-xl text-gray-700 mt-2">
-                    {result.statement_date?.value || 'Not found'}
+                    {typeof result.statement_date === 'string'
+                      ? result.statement_date
+                      : result.statement_date?.value || 'Not found'}
                   </p>
                 </div>
               </div>
