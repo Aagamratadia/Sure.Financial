@@ -120,6 +120,21 @@ class AxisExtractor(BaseExtractor):
     
     def extract_due_date(self, text: str) -> Tuple[DateField, float]:
         """Extract payment due date - Axis formats"""
+        # Try to find a date after the statement period (e.g., 05/10/2024)
+        # Payment summary line: ... 16/08/2024 - 15/09/2024 05/10/2024 13/09/2024
+        summary_pattern = r"\d{1,2}/\d{1,2}/\d{4}\s*-\s*\d{1,2}/\d{1,2}/\d{4}\s+(\d{1,2}/\d{1,2}/\d{4})"
+        match = re.search(summary_pattern, text)
+        if match:
+            date_raw = match.group(1)
+            date_formatted = parse_date(date_raw)
+            if date_formatted:
+                field = DateField(
+                    raw=date_raw,
+                    formatted=date_formatted
+                )
+                logger.info(f"Axis: Found due date (summary): {date_formatted}")
+                return field, 0.95
+        # Fallback to standard patterns
         patterns = [
             r"Payment\s+Due\s+Date\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
             r"Due\s+Date\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})",
@@ -129,13 +144,11 @@ class AxisExtractor(BaseExtractor):
             r"Payment\s+Due\s+Date\s*:?\s*.{0,100}?(\d{2}-\w{3}-\d{4})",
             r"Due\s+Date\s*:?\s*.{0,100}?(\d{2}-\w{3}-\d{4})",
         ]
-        
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if match:
                 date_raw = match.group(1)
                 date_formatted = parse_date(date_raw)
-                
                 if date_formatted:
                     field = DateField(
                         raw=date_raw,
@@ -143,12 +156,31 @@ class AxisExtractor(BaseExtractor):
                     )
                     logger.info(f"Axis: Found due date: {date_formatted}")
                     return field, 0.9
-        
         logger.warning("Axis: Due date not found")
         return DateField(raw=""), 0.0
     
     def extract_total_amount(self, text: str) -> Tuple[AmountField, float]:
         """Extract total amount due - Axis formats"""
+        # Try to find Dr/Cr pattern in payment summary line
+        # Example: 40,491.00 Dr
+        drcr_pattern = r"([\d,]+\.\d{2})\s*Dr"
+        match = re.search(drcr_pattern, text)
+        if match:
+            amount_raw = match.group(1)
+            amount_str = amount_raw.replace(',', '')
+            try:
+                amount = float(amount_str)
+                if amount > 0:
+                    field = AmountField(
+                        raw=amount_raw,
+                        amount=amount,
+                        currency="INR"
+                    )
+                    logger.info(f"Axis: Found amount (Dr): INR {amount}")
+                    return field, 0.95
+            except ValueError:
+                pass
+        # Fallback to standard patterns
         patterns = [
             r"Total\s+Amount\s+Due\s*:?\s*(?:Rs\.?|INR|₹)\s*([\d,]+\.?\d*)",
             r"Amount\s+Payable\s*:?\s*(?:Rs\.?|INR|₹)\s*([\d,]+\.?\d*)",
@@ -158,12 +190,10 @@ class AxisExtractor(BaseExtractor):
             r"Total\s+Amount\s+Due\s*.{0,100}?(?:Rs\.?|INR|₹)\s*([\d,]+\.?\d*)",
             r"Amount\s+Due\s*:?\s*(?:Rs\.?|INR|₹)\s*([\d,]+\.?\d*)",
         ]
-        
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if match:
                 amount_raw = match.group(1)
-                # Clean and parse the amount
                 amount_str = amount_raw.replace(',', '')
                 try:
                     amount = float(amount_str)
@@ -177,18 +207,15 @@ class AxisExtractor(BaseExtractor):
                         return field, 0.9
                 except ValueError:
                     continue
-        
         # Fallback: try to find just the number after "Total Amount Due"
         fallback_patterns = [
             r"Total\s+Amount\s+Due\s*.{0,200}?([\d,]+\.?\d*)",
             r"Amount\s+Payable\s*.{0,200}?([\d,]+\.?\d*)",
         ]
-        
         for pattern in fallback_patterns:
             match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
             if match:
                 amount_raw = match.group(1)
-                # Only accept if it looks like a reasonable amount
                 if ',' in amount_raw or '.' in amount_raw:
                     try:
                         amount = float(amount_raw.replace(',', ''))
@@ -202,7 +229,6 @@ class AxisExtractor(BaseExtractor):
                             return field, 0.75
                     except ValueError:
                         continue
-        
         logger.warning("Axis: Total amount not found")
         return AmountField(raw="", amount=0.0, currency="INR"), 0.0
 
