@@ -54,8 +54,29 @@ class AxisExtractor(BaseExtractor):
         return "", 0.0
     
     def extract_statement_period(self, text: str) -> Tuple[DateRangeField, float]:
-        """Extract statement period - Axis formats"""
-        # Range patterns
+        """Extract statement period and statement generated date for Axis Bank"""
+        # Try to find payment summary line: ... 16/08/2024 - 15/09/2024 05/10/2024 13/09/2024
+        summary_pattern = r"(\d{1,2}/\d{1,2}/\d{4})\s*-\s*(\d{1,2}/\d{1,2}/\d{4})\s+(\d{1,2}/\d{1,2}/\d{4})\s+(\d{1,2}/\d{1,2}/\d{4})"
+        match = re.search(summary_pattern, text)
+        if match:
+            start_raw = match.group(1)
+            end_raw = match.group(2)
+            due_raw = match.group(3)
+            statement_raw = match.group(4)
+            start_date = parse_date(start_raw)
+            end_date = parse_date(end_raw)
+            statement_date = parse_date(statement_raw)
+            if start_date and end_date and statement_date:
+                field = DateRangeField(
+                    raw=f"{start_raw} to {end_raw}",
+                    start_date=start_date,
+                    end_date=end_date
+                )
+                # Store statement_date in a custom attribute for use in serialization if needed
+                field.generated_date = statement_date
+                logger.info(f"Axis: Found statement period: {start_date} to {end_date}, statement date: {statement_date}")
+                return field, 0.9
+        # Fallback to previous logic
         range_patterns = [
             r"Statement\s+Date\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})\s*(?:to|To|TO)\s*(\d{2}/\d{2}/\d{4})",
             r"Statement\s+Period\s*:?\s*.{0,100}?(\d{2}/\d{2}/\d{4})\s*(?:to|To|TO)\s*(\d{2}/\d{2}/\d{4})",
@@ -71,7 +92,6 @@ class AxisExtractor(BaseExtractor):
                 start_date = parse_date(start_raw)
                 end_date = parse_date(end_raw)
                 if start_date and end_date:
-                    # Statement date for Axis is the start date (statement generated date)
                     field = DateRangeField(
                         raw=f"{start_raw} to {end_raw}",
                         start_date=start_date,
