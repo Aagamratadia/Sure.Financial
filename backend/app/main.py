@@ -1,6 +1,7 @@
 """FastAPI main application"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+import os
 from contextlib import asynccontextmanager
 import logging
 
@@ -62,12 +63,25 @@ app = FastAPI(
 )
 
 # CORS middleware
+allowed_origins = os.getenv("ALLOWED_ORIGINS")
+if allowed_origins:
+    origins_list = [o.strip() for o in allowed_origins.split(",") if o.strip()]
+else:
+    origins_list = [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "https://sure-financial-sigma.vercel.app",
+    ]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 # Include API router
