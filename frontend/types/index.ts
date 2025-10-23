@@ -42,7 +42,19 @@ export interface ParseResult {
   statement_date?: DateField
   billing_period?: DateRangeField
   total_amount_due?: AmountField
+  minimum_amount_due?: AmountField
+  previous_balance?: AmountField
   payment_due_date?: DateField
+  available_credit_limit?: AmountField
+  reward_points_summary?: {
+    value: string | null
+    confidence?: number
+  }
+  transactions?: Array<{
+    date: string
+    merchant: string
+    amount: string
+  }>
   confidence_scores?: ConfidenceScores
   error?: string
   processing_time?: number

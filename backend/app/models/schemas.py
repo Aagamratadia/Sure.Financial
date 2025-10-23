@@ -53,6 +53,12 @@ class ParsedData(BaseModel):
     statement_period: DateRangeField = Field(description="Statement billing cycle dates")
     payment_due_date: DateField = Field(description="Payment deadline")
     total_amount_due: AmountField = Field(description="Total outstanding balance")
+    # Optional enhanced fields
+    minimum_amount_due: Optional[AmountField] = Field(default=None, description="Minimum amount due")
+    previous_balance: Optional[AmountField] = Field(default=None, description="Previous statement balance")
+    available_credit_limit: Optional[AmountField] = Field(default=None, description="Available credit limit")
+    reward_points_summary: Optional[str] = Field(default=None, description="Reward points summary text or total")
+    transactions: Optional[list[dict]] = Field(default=None, description="List of transactions with date, merchant, amount")
 
 
 class Metadata(BaseModel):

@@ -84,7 +84,8 @@ export default function Home() {
           {/* Two-column layout: left shows Upload/Loader/Results, right shows features */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             {/* Left column */}
-            <div>
+            <div className={loading || result ? 'lg:col-span-2' : ''}>
+              <div className={(loading || result) ? 'max-w-4xl mx-auto' : ''}>
               {loading ? (
                 <div className="flex flex-col items-center justify-center py-16 px-4" aria-live="polite">
                   <div className="relative">
@@ -109,6 +110,7 @@ export default function Home() {
                   onUploadStart={handleUploadStart}
                 />
               )}
+              </div>
             </div>
 
             {/* Right: Feature cards (only when not loading and no results) */}

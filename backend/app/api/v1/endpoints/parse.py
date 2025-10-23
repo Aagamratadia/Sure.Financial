@@ -1,6 +1,6 @@
 """Parsing endpoints"""
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
-from typing import List
+from typing import List, Dict, Any
 import uuid
 from datetime import datetime
 
@@ -26,7 +26,7 @@ file_service = FileService()
 orchestrator = ParserOrchestrator()
 
 
-@router.post("/upload", response_model=ParseResult, status_code=200)
+@router.post("/upload", response_model=Dict[str, Any], status_code=200)
 async def upload_statement(
     file: UploadFile = File(...),
     use_ocr: bool = True,
@@ -64,7 +64,6 @@ async def upload_statement(
         # Save file
         file_path = await file_service.save_upload(file)
         logger.info(f"Processing job {job_id}: {file.filename}")
-        
         await repo.update_job_status(
             job_id, JobStatus.PROCESSING, progress=30, message="Extracting text from PDF"
         )
@@ -72,19 +71,87 @@ async def upload_statement(
         # Parse PDF
         result = await orchestrator.parse(file_path, file.filename, job_id, use_ocr)
         
+        # Save results
+        await repo.save_result(result)
         await repo.update_job_status(
             job_id, JobStatus.PROCESSING, progress=90, message="Finalizing results"
         )
         
-        # Save results
-        await repo.save_result(result)
+        # Build simplified result for frontend (same as /status mapping)
+        simplified_result: Dict[str, Any] = {
+            "job_id": result.job_id,
+            "status": result.status.value,
+            "card_issuer": result.data.card_issuer,
+            "parser_used": result.metadata.parser_used.value,
+            "card_number": {
+                "value": result.data.card_number,
+                "confidence": result.confidence_scores.card_number,
+                "raw_text": result.data.card_number,
+            },
+            "statement_date": {
+                "value": result.data.statement_period.start_date or result.data.statement_period.end_date,
+                "confidence": result.confidence_scores.statement_period,
+                "raw_text": result.data.statement_period.raw,
+            },
+            "billing_period": {
+                "start_date": result.data.statement_period.start_date,
+                "end_date": result.data.statement_period.end_date,
+                "confidence": result.confidence_scores.statement_period,
+                "raw_text": result.data.statement_period.raw,
+            },
+            "total_amount_due": {
+                "value": f"{result.data.total_amount_due.currency} {result.data.total_amount_due.amount}",
+                "confidence": result.confidence_scores.total_amount_due,
+                "raw_text": result.data.total_amount_due.raw,
+                "currency": result.data.total_amount_due.currency,
+            },
+            "payment_due_date": {
+                "value": result.data.payment_due_date.formatted,
+                "confidence": result.confidence_scores.payment_due_date,
+                "raw_text": result.data.payment_due_date.raw,
+            },
+            "confidence_scores": {
+                "overall": result.confidence_scores.average,
+                "card_number": result.confidence_scores.card_number,
+                "statement_date": result.confidence_scores.statement_period,
+                "billing_period": result.confidence_scores.statement_period,
+                "total_amount_due": result.confidence_scores.total_amount_due,
+                "payment_due_date": result.confidence_scores.payment_due_date,
+            },
+            "processing_time": result.metadata.processing_time_ms,
+        }
+        # Optional enhanced fields
+        if result.data.minimum_amount_due:
+            simplified_result["minimum_amount_due"] = {
+                "value": f"{result.data.minimum_amount_due.currency} {result.data.minimum_amount_due.amount}",
+                "raw_text": result.data.minimum_amount_due.raw,
+                "currency": result.data.minimum_amount_due.currency,
+            }
+        if result.data.previous_balance:
+            simplified_result["previous_balance"] = {
+                "value": f"{result.data.previous_balance.currency} {result.data.previous_balance.amount}",
+                "raw_text": result.data.previous_balance.raw,
+                "currency": result.data.previous_balance.currency,
+            }
+        if result.data.available_credit_limit:
+            simplified_result["available_credit_limit"] = {
+                "value": f"{result.data.available_credit_limit.currency} {result.data.available_credit_limit.amount}",
+                "raw_text": result.data.available_credit_limit.raw,
+                "currency": result.data.available_credit_limit.currency,
+            }
+        if result.data.reward_points_summary:
+            simplified_result["reward_points_summary"] = {
+                "value": result.data.reward_points_summary
+            }
+        if result.data.transactions:
+            simplified_result["transactions"] = result.data.transactions
         await repo.update_job_status(
             job_id, JobStatus.COMPLETED, progress=100, message="Parsing completed successfully"
         )
         
         logger.info(f"Job {job_id} completed successfully")
-        return result
-    
+        return simplified_result
+
     except Exception as e:
         logger.error(f"Job {job_id} failed: {e}", exc_info=True)
         await repo.update_job_status(
@@ -163,6 +230,31 @@ async def get_job_status(job_id: str, db=Depends(get_database)):
                 },
                 "processing_time": result.metadata.processing_time_ms
             }
+            # Optional enhanced fields when available
+            if result.data.minimum_amount_due:
+                simplified_result["minimum_amount_due"] = {
+                    "value": f"{result.data.minimum_amount_due.currency} {result.data.minimum_amount_due.amount}",
+                    "raw_text": result.data.minimum_amount_due.raw,
+                    "currency": result.data.minimum_amount_due.currency,
+                }
+            if result.data.previous_balance:
+                simplified_result["previous_balance"] = {
+                    "value": f"{result.data.previous_balance.currency} {result.data.previous_balance.amount}",
+                    "raw_text": result.data.previous_balance.raw,
+                    "currency": result.data.previous_balance.currency,
+                }
+            if result.data.available_credit_limit:
+                simplified_result["available_credit_limit"] = {
+                    "value": f"{result.data.available_credit_limit.currency} {result.data.available_credit_limit.amount}",
+                    "raw_text": result.data.available_credit_limit.raw,
+                    "currency": result.data.available_credit_limit.currency,
+                }
+            if result.data.reward_points_summary:
+                simplified_result["reward_points_summary"] = {
+                    "value": result.data.reward_points_summary
+                }
+            if result.data.transactions:
+                simplified_result["transactions"] = result.data.transactions
             # Store as dict - Pydantic will handle it
             status.result = simplified_result
     

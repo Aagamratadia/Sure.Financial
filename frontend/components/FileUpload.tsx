@@ -141,7 +141,7 @@ export default function FileUpload({
           <li>✓ Axis Bank</li>
           <li>✓ HDFC Bank</li>
           <li>✓ ICICI Bank</li>
-          <li>✓ IDFC Bank</li>
+          <li>✓ IDFC First Bank</li>
           <li>✓ American Express</li>
           <li>✓ Capital One</li>
         </ul>

@@ -151,7 +151,12 @@ class JobRepository:
                 card_number=result_doc["data"]["card_number"],
                 statement_period=DateRangeField(**result_doc["data"]["statement_period"]),
                 payment_due_date=DateField(**result_doc["data"]["payment_due_date"]),
-                total_amount_due=AmountField(**result_doc["data"]["total_amount_due"])
+                total_amount_due=AmountField(**result_doc["data"]["total_amount_due"]),
+                minimum_amount_due=AmountField(**result_doc["data"]["minimum_amount_due"]) if result_doc["data"].get("minimum_amount_due") else None,
+                previous_balance=AmountField(**result_doc["data"]["previous_balance"]) if result_doc["data"].get("previous_balance") else None,
+                available_credit_limit=AmountField(**result_doc["data"]["available_credit_limit"]) if result_doc["data"].get("available_credit_limit") else None,
+                reward_points_summary=result_doc["data"].get("reward_points_summary"),
+                transactions=result_doc["data"].get("transactions"),
             ),
             confidence_scores=ConfidenceScores(
                 card_issuer=result_doc["confidence_scores"]["card_issuer"],

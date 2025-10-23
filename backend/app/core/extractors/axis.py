@@ -165,15 +165,31 @@ class AxisExtractor(BaseExtractor):
         due_date, due_conf = self.extract_due_date(text)
         total_amount, amount_conf = self.extract_total_amount(text)
 
+        # Axis-specific optional fields
+        min_due = self.extract_minimum_amount_due(text)
+        prev_bal = self.extract_previous_balance(text)
+        avail_credit = self.extract_available_credit_limit(text)
+        rewards = self.extract_reward_points_summary(text)
+
+        data = {
+            "card_issuer": issuer,
+            "card_number": card_number,
+            "statement_period": statement_period,
+            "statement_date": statement_date,
+            "payment_due_date": due_date,
+            "total_amount_due": total_amount,
+        }
+        if min_due:
+            data["minimum_amount_due"] = min_due
+        if prev_bal:
+            data["previous_balance"] = prev_bal
+        if avail_credit:
+            data["available_credit_limit"] = avail_credit
+        if rewards:
+            data["reward_points_summary"] = rewards
+
         return {
-            "data": {
-                "card_issuer": issuer,
-                "card_number": card_number,
-                "statement_period": statement_period,
-                "statement_date": statement_date,
-                "payment_due_date": due_date,
-                "total_amount_due": total_amount,
-            },
+            "data": data,
             "confidence": {
                 "card_issuer": issuer_conf,
                 "card_number": card_conf,
@@ -351,4 +367,96 @@ class AxisExtractor(BaseExtractor):
                         continue
         logger.warning("Axis: Total amount not found")
         return AmountField(raw="", amount=0.0, currency="INR"), 0.0
+
+
+    # -----------------------
+    # Axis-specific optional extractors
+    # -----------------------
+    def extract_minimum_amount_due(self, text: str):
+        """Extract Minimum Amount Due from Axis payment summary line.
+        Example line:
+        40,491.00 Dr 810.00 Dr 16/08/2024 - 15/09/2024 05/10/2024 13/09/2024
+        """
+        pattern = r"([\d,]+\.\d{2})\s*Dr\s+([\d,]+\.\d{2})\s*Dr\s+\d{1,2}/\d{1,2}/\d{4}\s*-\s*\d{1,2}/\d{1,2}/\d{4}"
+        m = re.search(pattern, text)
+        if m:
+            # group(1) is Total Amount Due, group(2) is Minimum Amount Due
+            min_raw = m.group(2)
+            try:
+                amt = float(min_raw.replace(',', ''))
+                field = AmountField(raw=min_raw, amount=amt, currency="INR")
+                logger.info(f"Axis: Found minimum amount due: INR {amt}")
+                return field
+            except ValueError:
+                pass
+        # Fallback label-based
+        fallback = re.search(r"Minimum\s+Amount\s+Due\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+\.?\d*)", text, re.IGNORECASE)
+        if fallback:
+            min_raw = fallback.group(1)
+            try:
+                amt = float(min_raw.replace(',', ''))
+                field = AmountField(raw=min_raw, amount=amt, currency="INR")
+                logger.info(f"Axis: Found minimum amount due (fallback): INR {amt}")
+                return field
+            except ValueError:
+                pass
+        return None
+
+    def extract_previous_balance(self, text: str):
+        """Extract Previous Balance from account summary line.
+        Looks for a number tagged with Dr near 'Previous Balance'.
+        """
+        # Try to capture first amount after 'Previous Balance'
+        pat = r"Previous\s+Balance[^\n\r]*[\n\r]+\s*([\d,]+\.\d{2})\s*Dr"
+        m = re.search(pat, text, re.IGNORECASE)
+        if m:
+            raw = m.group(1)
+            try:
+                amt = float(raw.replace(',', ''))
+                field = AmountField(raw=raw, amount=amt, currency="INR")
+                logger.info(f"Axis: Found previous balance: INR {amt}")
+                return field
+            except ValueError:
+                pass
+        # Generic label match
+        m2 = re.search(r"Previous\s+Balance\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+\.?\d*)", text, re.IGNORECASE)
+        if m2:
+            raw = m2.group(1)
+            try:
+                amt = float(raw.replace(',', ''))
+                field = AmountField(raw=raw, amount=amt, currency="INR")
+                logger.info(f"Axis: Found previous balance (fallback): INR {amt}")
+                return field
+            except ValueError:
+                pass
+        return None
+
+    def extract_available_credit_limit(self, text: str):
+        """Extract available credit or credit limit if present."""
+        labels = [
+            r"Available\s+Credit\s+Limit\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+\.?\d*)",
+            r"Credit\s+Limit\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+\.?\d*)",
+            r"Available\s+Limit\s*[:\-]?\s*(?:Rs\.?|INR|₹)?\s*([\d,]+\.?\d*)",
+        ]
+        for p in labels:
+            m = re.search(p, text, re.IGNORECASE)
+            if m:
+                raw = m.group(1)
+                try:
+                    amt = float(raw.replace(',', ''))
+                    field = AmountField(raw=raw, amount=amt, currency="INR")
+                    logger.info(f"Axis: Found credit/available limit: INR {amt}")
+                    return field
+                except ValueError:
+                    continue
+        return None
+
+    def extract_reward_points_summary(self, text: str):
+        """Try to capture reward points total or section snippet."""
+        m = re.search(r"Reward[s]?\s+Summary[\s\S]{0,120}?Total\s*:?\s*([\d,]+)", text, re.IGNORECASE)
+        if m:
+            logger.info("Axis: Found reward points total")
+            return f"Total Rewards: {m.group(1)}"
+        sec = re.search(r"Reward[s]?\s+Summary[\s\S]{0,200}", text, re.IGNORECASE)
+        return sec.group(0).strip() if sec else None
 

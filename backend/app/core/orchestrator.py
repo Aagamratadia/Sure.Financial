@@ -87,6 +87,53 @@ class ParserOrchestrator:
         
         # Step 3: Extract data using issuer-specific extractor
         extracted_data = await self._extract_data(text, issuer)
+
+        # Optional fallback: if total amount is missing/zero, try alternate parsers
+        fallback_used = None
+        if (
+            extracted_data["data"].total_amount_due is None
+            or extracted_data["data"].total_amount_due.amount == 0.0
+        ):
+            alt_order: list[ParserType] = []
+            if parser_used == ParserType.TESSERACT:
+                alt_order = [ParserType.PYMUPDF, ParserType.PDFPLUMBER]
+            elif parser_used == ParserType.PYMUPDF:
+                alt_order = [ParserType.PDFPLUMBER, ParserType.TESSERACT]
+            else:
+                alt_order = [ParserType.PYMUPDF, ParserType.TESSERACT]
+
+            for alt in alt_order:
+                try:
+                    if alt == ParserType.PYMUPDF:
+                        alt_text = await self.pymupdf_parser.extract_text(file_path)
+                        if not self.pymupdf_parser.has_sufficient_text(alt_text, settings.MIN_TEXT_THRESHOLD):
+                            continue
+                        alt_metadata = await self.pymupdf_parser.extract_metadata(file_path)
+                    elif alt == ParserType.PDFPLUMBER:
+                        alt_text = await self.pdfplumber_parser.extract_text(file_path)
+                        if not self.pdfplumber_parser.has_sufficient_text(alt_text, settings.MIN_TEXT_THRESHOLD):
+                            continue
+                        alt_metadata = await self.pdfplumber_parser.extract_metadata(file_path)
+                    else:
+                        alt_text = await self.tesseract_parser.extract_text(file_path)
+                        alt_metadata = await self.tesseract_parser.extract_metadata(file_path)
+
+                    # Re-extract with same issuer
+                    alt_extracted = await self._extract_data(alt_text, issuer)
+                    if (
+                        alt_extracted["data"].total_amount_due
+                        and alt_extracted["data"].total_amount_due.amount > 0.0
+                    ):
+                        extracted_data = alt_extracted
+                        parser_used = alt
+                        metadata = alt_metadata
+                        fallback_used = alt
+                        logger.info(
+                            f"Fallback parser {alt.value} yielded total_amount_due=INR {extracted_data['data'].total_amount_due.amount}"
+                        )
+                        break
+                except Exception:
+                    continue
         
         # Step 4: Calculate processing time
         processing_time_ms = int((time.time() - start_time) * 1000)
@@ -171,12 +218,19 @@ class ParserOrchestrator:
         extracted = extractor.extract_all(text)
         
         # Build Pydantic models
+        # Build ParsedData including optional fields when available
+        data_dict = extracted["data"]
         parsed_data = ParsedData(
-            card_issuer=extracted["data"]["card_issuer"],
-            card_number=extracted["data"]["card_number"],
-            statement_period=extracted["data"]["statement_period"],
-            payment_due_date=extracted["data"]["payment_due_date"],
-            total_amount_due=extracted["data"]["total_amount_due"]
+            card_issuer=data_dict["card_issuer"],
+            card_number=data_dict["card_number"],
+            statement_period=data_dict["statement_period"],
+            payment_due_date=data_dict["payment_due_date"],
+            total_amount_due=data_dict["total_amount_due"],
+            minimum_amount_due=data_dict.get("minimum_amount_due"),
+            previous_balance=data_dict.get("previous_balance"),
+            available_credit_limit=data_dict.get("available_credit_limit"),
+            reward_points_summary=data_dict.get("reward_points_summary"),
+            transactions=data_dict.get("transactions"),
         )
         
         confidence_scores = ConfidenceScores(
