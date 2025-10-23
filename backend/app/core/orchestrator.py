@@ -9,6 +9,7 @@ from app.core.extractors.kotak import KotakExtractor
 from app.core.extractors.hdfc import HDFCExtractor
 from app.core.extractors.icici import ICICIExtractor
 from app.core.extractors.idfc import IDFCExtractor
+from app.core.extractors.axis import AxisExtractor
 from app.core.extractors.amex import AmexExtractor
 from app.core.extractors.capital_one import CapitalOneExtractor
 from app.services.issuer_detection import IssuerDetector
@@ -35,6 +36,7 @@ class ParserOrchestrator:
             CardIssuer.HDFC: HDFCExtractor(),
             CardIssuer.ICICI: ICICIExtractor(),
             CardIssuer.IDFC: IDFCExtractor(),
+            CardIssuer.AXIS: AxisExtractor(),
             CardIssuer.AMEX: AmexExtractor(),
             CardIssuer.CAPITAL_ONE: CapitalOneExtractor(),
         }

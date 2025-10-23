@@ -59,6 +59,7 @@ class IssuerDetector:
             "hdfc": CardIssuer.HDFC,
             "icici": CardIssuer.ICICI,
             "idfc": CardIssuer.IDFC,
+            "axis": CardIssuer.AXIS,
             "amex": CardIssuer.AMEX,
             "capital_one": CardIssuer.CAPITAL_ONE,
         }

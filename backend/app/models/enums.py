@@ -8,6 +8,7 @@ class CardIssuer(str, Enum):
     HDFC = "HDFC Bank"
     ICICI = "ICICI Bank"
     IDFC = "IDFC First Bank"
+    AXIS = "Axis Bank"
     AMEX = "American Express Banking Corp"
     CAPITAL_ONE = "Capital One Europe Plc"
     UNKNOWN = "Unknown"

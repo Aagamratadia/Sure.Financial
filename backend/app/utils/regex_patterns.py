@@ -46,6 +46,12 @@ ISSUER_PATTERNS = {
         r"idfcfirstbank\.com",
         r"IDFC\s+Bank",
         r"IDFC\s+FIRST",
+    ],
+    "axis": [
+        r"Axis\s+Bank",
+        r"AXIS\s+BANK",
+        r"axisbank\.com",
+        r"Axis\s+Bank\s+Ltd",
     ]
 }
 
