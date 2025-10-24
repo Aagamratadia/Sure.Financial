@@ -120,7 +120,7 @@ export default function FileUpload({
           <button
             type="button"
             onClick={open}
-            className="mt-2 px-6 py-3 bg-amber-700 text-white rounded-md hover:shadow-md transition-all font-medium focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
+            className="mt-2 px-6 py-3 bg-amber-700 text-white rounded-sm hover:shadow-md transition-all font-medium focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
             aria-label="Select file to upload"
           >
             Select File

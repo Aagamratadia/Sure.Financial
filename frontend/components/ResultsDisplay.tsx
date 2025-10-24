@@ -48,7 +48,7 @@ export default function ResultsDisplay({ result, onParseAnother }: ResultsDispla
             <button
               onClick={handleSaveToDatabase}
               disabled={saveStatus === 'saving' || saveStatus === 'saved'}
-              className={`inline-flex items-center px-4 py-2 rounded-md text-sm font-medium transition-colors
+              className={`inline-flex items-center px-4 py-2 rounded-sm text-sm font-medium transition-colors border border-amber-600
                 ${saveStatus === 'saved' 
                   ? 'bg-green-100 text-green-800 cursor-default' 
                   : 'bg-amber-700 text-white hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-700'
@@ -75,7 +75,7 @@ export default function ResultsDisplay({ result, onParseAnother }: ResultsDispla
             </button>
             <button
               onClick={handleDownloadJSON}
-              className="inline-flex items-center px-4 py-2 border border-stone-300 rounded-md shadow-sm text-sm font-medium text-black bg-white hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-700"
+              className="inline-flex items-center px-4 py-2 border border-amber-600 rounded-sm shadow-sm text-sm font-medium text-black bg-white hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-700"
               aria-label="Download results as JSON"
             >
               <Download className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -83,7 +83,7 @@ export default function ResultsDisplay({ result, onParseAnother }: ResultsDispla
             </button>
             <button
               onClick={onParseAnother}
-              className="inline-flex items-center px-4 py-2 border border-stone-300 rounded-md shadow-sm text-sm font-medium text-black bg-white hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-700"
+              className="inline-flex items-center px-4 py-2 border border-amber-600 rounded-sm shadow-sm text-sm font-medium text-black bg-white hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-700"
               aria-label="Parse another statement"
             >
               <span>Parse Another</span>
@@ -284,10 +284,21 @@ export default function ResultsDisplay({ result, onParseAnother }: ResultsDispla
 
             {/* Reward Points Summary (optional) */}
             {result.reward_points_summary?.value && (() => {
-              const raw = result.reward_points_summary!.value;
-              // Try to extract a points number (prefer the last integer-like token)
-              const matches = raw.match(/\d{1,3}(?:,\d{3})*|\d+/g);
-              const points = matches && matches.length > 0 ? matches[matches.length - 1] : null;
+              const raw = result.reward_points_summary!.value as string;
+              // 1) Prefer an explicit 'Rewards Closing Balance' number
+              const mClosing = raw.match(/Rewards?\s+Closing\s+Balance\s*:?\s*([\d,]+)/i) 
+                || raw.match(/Closing\s+Balance[^\d]*([\d,]+)/i);
+              let points: string | null = mClosing ? mClosing[1] : null;
+              // 2) Otherwise pick the largest numeric token as a heuristic
+              if (!points) {
+                const nums = (raw.match(/\d{1,3}(?:,\d{3})*|\d+/g) || [])
+                  .map(n => ({ raw: n, val: parseInt(n.replace(/,/g, ''), 10) }))
+                  .filter(x => !Number.isNaN(x.val));
+                if (nums.length > 0) {
+                  nums.sort((a, b) => b.val - a.val);
+                  points = nums[0].raw;
+                }
+              }
               const snippet = raw.length > 140 ? raw.slice(0, 140) + '…' : raw;
               return (
                 <div className="border-t pt-4">
@@ -358,7 +369,7 @@ export default function ResultsDisplay({ result, onParseAnother }: ResultsDispla
               <h3 className="text-lg font-semibold text-black">Raw JSON Data</h3>
               <button
                 onClick={handleDownloadJSON}
-                className="inline-flex items-center px-3 py-1.5 border border-stone-300 rounded-md shadow-sm text-xs font-medium text-black bg-white hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-700"
+                className="inline-flex items-center px-3 py-1.5 border border-amber-600 rounded-sm shadow-sm text-xs font-medium text-black bg-white hover:bg-stone-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-amber-700"
               >
                 <Download className="h-3.5 w-3.5 mr-1.5" aria-hidden="true" />
                 Download JSON
