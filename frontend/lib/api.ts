@@ -2,12 +2,22 @@
 import { ParseResult, JobStatusResponse } from '@/types';
 
 // API base URL
-export const API_BASE_URL = (
+// Ensure the base URL ALWAYS ends with '/api/v1' to match backend `settings.API_PREFIX`
+function ensureApiV1(url: string): string {
+  const base = url.replace(/\/$/, '');
+  // If it already ends with /api/v1 (or any /api/v{number}), keep as-is
+  if (/\/api\/v\d+$/.test(base)) return base;
+  return `${base}/api/v1`;
+}
+
+const RAW_BASE_URL = (
   process.env.NEXT_PUBLIC_API_BASE_URL ||
   (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
-    ? 'https://rag-cloud-test-production.up.railway.app/api/v1'
-    : 'http://localhost:8000/api/v1')
-).replace(/\/$/, '');
+    ? 'https://rag-cloud-test-production.up.railway.app'
+    : 'http://localhost:8000')
+);
+
+export const API_BASE_URL = ensureApiV1(RAW_BASE_URL);
 
 /**
  * Upload a statement file for processing

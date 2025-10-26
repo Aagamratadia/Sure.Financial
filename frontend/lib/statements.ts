@@ -1,7 +1,14 @@
 import axios from 'axios'
 import type { ParseResult } from '@/types'
 
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1').replace(/\/$/, '')
+function ensureApiV1(url: string): string {
+  const base = url.replace(/\/$/, '')
+  if (/\/api\/v\d+$/.test(base)) return base
+  return `${base}/api/v1`
+}
+
+const RAW_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+const API_BASE_URL = ensureApiV1(RAW_BASE_URL)
 
 // Fallback mock data in case MongoDB connection fails
 const MOCK_STATEMENTS: ParseResult[] = [
